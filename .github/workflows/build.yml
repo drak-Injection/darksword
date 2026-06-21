@@ -13,6 +13,10 @@ jobs:
 
     - name: Build archive
       run: |
+        echo "=== Checking project ==="
+        ls -la darksword-kexploit-fun.xcodeproj/
+        xcodebuild -list -project darksword-kexploit-fun.xcodeproj 2>&1
+        echo "=== Building ==="
         xcodebuild archive \
           -project darksword-kexploit-fun.xcodeproj \
           -scheme darksword-kexploit-fun \
@@ -21,7 +25,7 @@ jobs:
           -derivedDataPath build/DerivedData \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO 2>&1 | tail -50
+          CODE_SIGNING_ALLOWED=NO 2>&1 | tail -80
 
     - name: Debug archive
       run: |
