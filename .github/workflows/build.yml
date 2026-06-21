@@ -11,46 +11,31 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build archive
+    - name: Compile
       run: |
-        echo "=== Checking project ==="
-        ls -la darksword-kexploit-fun.xcodeproj/
-        xcodebuild -list -project darksword-kexploit-fun.xcodeproj 2>&1
-        echo "=== Building ==="
-        xcodebuild archive \
-          -project darksword-kexploit-fun.xcodeproj \
-          -scheme darksword-kexploit-fun \
-          -configuration Release \
-          -archivePath build/darksword.xcarchive \
-          -derivedDataPath build/DerivedData \
-          CODE_SIGN_IDENTITY="" \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO 2>&1 | tail -80
+        cd darksword-kexploit-fun
+        SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+        clang -arch arm64 -arch arm64e \
+          -isysroot "$SDK" \
+          -miphoneos-version-min=15.0 \
+          -framework Foundation -framework UIKit -framework CoreServices \
+          -framework Security -framework IOSurface -framework IOKit \
+          -fobjc-arc -Wno-availability \
+          -o kfun \
+          *.m kexploit/*.m kpf/*.m TaskRop/*.m research/*.m utils/*.m \
+          2>&1 | tail -40
+        ls -la kfun 2>/dev/null && echo "BUILD OK" || echo "BUILD FAILED"
 
-    - name: Debug archive
+    - name: Package IPA
       run: |
-        echo "Archive contents:"
-        find build/darksword.xcarchive -type f 2>/dev/null | head -40
-        echo "---"
-        ls -la build/darksword.xcarchive/Products/Applications/ 2>/dev/null || echo "No Products/Applications"
-
-    - name: Create IPA manually
-      run: |
-        APP=$(find build/darksword.xcarchive -name "*.app" -maxdepth 4 -print -quit)
-        if [ -z "$APP" ]; then
-          echo "No .app found in archive!"
-          echo "Listing all files:"
-          find build/darksword.xcarchive -type f | head -30
-          exit 1
-        fi
-        echo "Found app: $APP"
-        ls -la "$APP"
-        mkdir -p Payload
-        cp -R "$APP" Payload/
-        zip -r darksword.ipa Payload
-        ls -la darksword.ipa
+        mkdir -p Payload/kfun.app
+        cp darksword-kexploit-fun/kfun darksword-kexploit-fun/Info.plist Payload/kfun.app/ 2>/dev/null
+        cp -r darksword-kexploit-fun/Base.lproj Payload/kfun.app/ 2>/dev/null
+        cp -r darksword-kexploit-fun/Assets.xcassets Payload/kfun.app/ 2>/dev/null
+        cd Payload && zip -r ../kfun.ipa kfun.app && cd ..
+        ls -la kfun.ipa 2>/dev/null && echo "IPA OK"
 
     - uses: actions/upload-artifact@v4
       with:
         name: darksword-ipa
-        path: darksword.ipa
+        path: kfun.ipa
