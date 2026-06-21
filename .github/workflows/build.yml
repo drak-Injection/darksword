@@ -1,0 +1,48 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build archive
+      run: |
+        xcodebuild archive \
+          -project darksword-kexploit-fun.xcodeproj \
+          -scheme darksword-kexploit-fun \
+          -configuration Release \
+          -archivePath build/darksword.xcarchive \
+          -derivedDataPath build/DerivedData \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO 2>&1 | tail -100
+
+    - name: Export IPA
+      run: |
+        xcodebuild -exportArchive \
+          -archivePath build/darksword.xcarchive \
+          -exportPath build \
+          -exportOptionsPlist exportOptions.plist \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO 2>&1 || true
+        mkdir -p build/Payload
+        APP=$(find build/darksword.xcarchive -name "*.app" -maxdepth 3 | head -1)
+        if [ -n "$APP" ]; then
+          cp -R "$APP" build/Payload/
+          cd build && zip -r darksword.ipa Payload
+          echo "IPA created"
+        else
+          echo "No .app found"
+        fi
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: darksword-ipa
+        path: build/darksword.ipa
