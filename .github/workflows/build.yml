@@ -21,28 +21,32 @@ jobs:
           -derivedDataPath build/DerivedData \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO 2>&1 | tail -100
+          CODE_SIGNING_ALLOWED=NO 2>&1 | tail -50
 
-    - name: Export IPA
+    - name: Debug archive
       run: |
-        xcodebuild -exportArchive \
-          -archivePath build/darksword.xcarchive \
-          -exportPath build \
-          -exportOptionsPlist exportOptions.plist \
-          CODE_SIGN_IDENTITY="" \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO 2>&1 || true
-        mkdir -p build/Payload
-        APP=$(find build/darksword.xcarchive -name "*.app" -maxdepth 3 | head -1)
-        if [ -n "$APP" ]; then
-          cp -R "$APP" build/Payload/
-          cd build && zip -r darksword.ipa Payload
-          echo "IPA created"
-        else
-          echo "No .app found"
+        echo "Archive contents:"
+        find build/darksword.xcarchive -type f 2>/dev/null | head -40
+        echo "---"
+        ls -la build/darksword.xcarchive/Products/Applications/ 2>/dev/null || echo "No Products/Applications"
+
+    - name: Create IPA manually
+      run: |
+        APP=$(find build/darksword.xcarchive -name "*.app" -maxdepth 4 -print -quit)
+        if [ -z "$APP" ]; then
+          echo "No .app found in archive!"
+          echo "Listing all files:"
+          find build/darksword.xcarchive -type f | head -30
+          exit 1
         fi
+        echo "Found app: $APP"
+        ls -la "$APP"
+        mkdir -p Payload
+        cp -R "$APP" Payload/
+        zip -r darksword.ipa Payload
+        ls -la darksword.ipa
 
     - uses: actions/upload-artifact@v4
       with:
         name: darksword-ipa
-        path: build/darksword.ipa
+        path: darksword.ipa
