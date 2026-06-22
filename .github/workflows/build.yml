@@ -10,12 +10,14 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Compile all sources
+      shell: bash
       run: |
+        set -e
         cd darksword-kexploit-fun
         SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-        FRAMEWORKS="-framework Foundation -framework UIKit -framework CoreServices -framework Security -framework IOSurface -framework IOKit -framework QuartzCore"
+        FWKS="-framework Foundation -framework UIKit -framework CoreServices -framework Security -framework IOSurface -framework IOKit -framework QuartzCore"
         CFLAGS="-arch arm64 -isysroot $SDK -miphoneos-version-min=15.0 -fobjc-arc -Wno-everything"
-        INCLUDES="-I. -Iresearch -Ikexploit -Ikpf -Iutils -ITaskRop -IXPF/src -IXPF/external/ChOma/include"
+        INC="-I. -Iresearch -Ikexploit -Ikpf -Iutils -ITaskRop -IXPF/src -IXPF/external/ChOma/include"
 
         mkdir -p build
         OBJS=""
@@ -25,34 +27,33 @@ jobs:
           d=$(dirname "$f")
           mkdir -p "build/$d"
           o="build/${f%.*}.o"
-          err=$(clang $CFLAGS $INCLUDES -c "$f" -o "$o" 2>&1)
-          if [ -f "$o" ]; then
+          if clang $CFLAGS $INC -c "$f" -o "$o" 2>/tmp/compile_err.txt; then
             OBJS="$OBJS $o"
             OK=$((OK + 1))
           else
             FAIL=$((FAIL + 1))
             echo "FAIL: $f"
-            echo "$err" | grep "error:" | head -1
+            head -1 /tmp/compile_err.txt
           fi
         done
 
-        echo "=== OK:$OK FAIL:$FAIL ==="
-        [ $FAIL -gt 0 ] && echo "Some files failed to compile"
+        echo "=== Compiled: OK=$OK FAIL=$FAIL ==="
 
         echo "Linking $OK objects..."
-        LINK_OUT=$(clang $CFLAGS $FRAMEWORKS $OBJS -o kfun 2>&1)
-        LINK_RC=$?
-        if [ $LINK_RC -ne 0 ]; then
+        if clang $CFLAGS $FWKS $OBJS -o kfun 2>/tmp/link_err.txt; then
+          ls -la kfun && echo "BUILD OK"
+        else
           echo "=== LINK ERRORS ==="
-          echo "$LINK_OUT"
+          cat /tmp/link_err.txt
           echo "=== END ==="
-          echo "BUILD FAILED (linker exit $LINK_RC)"
+          echo "BUILD FAILED"
           exit 1
         fi
-        ls -la kfun && echo "BUILD OK"
 
     - name: Package IPA
+      shell: bash
       run: |
+        set -e
         mkdir -p Payload/kfun.app
         cp darksword-kexploit-fun/kfun Payload/kfun.app/
         cp darksword-kexploit-fun/Info.plist Payload/kfun.app/
