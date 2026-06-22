@@ -15,7 +15,7 @@ jobs:
         set -e
         cd darksword-kexploit-fun
         SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-        FWKS="-framework Foundation -framework UIKit -framework CoreServices -framework Security -framework IOSurface -framework IOKit -framework QuartzCore"
+        FWKS="-framework Foundation -framework UIKit -framework CoreServices -framework Security -framework IOSurface -framework IOKit -framework QuartzCore -lcompression"
         CFLAGS="-arch arm64 -isysroot $SDK -miphoneos-version-min=15.0 -fobjc-arc -Wno-everything"
         INC="-I. -Iresearch -Ikexploit -Ikpf -Iutils -ITaskRop -IXPF/src -IXPF/external/ChOma/include"
 
