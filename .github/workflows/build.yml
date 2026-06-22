@@ -39,9 +39,17 @@ jobs:
         echo "=== OK:$OK FAIL:$FAIL ==="
         [ $FAIL -gt 0 ] && echo "Some files failed to compile"
 
-        echo "Linking..."
-        clang $CFLAGS $FRAMEWORKS $OBJS -o kfun 2>&1
-        ls -la kfun && echo "BUILD OK" || { echo "BUILD FAILED"; exit 1; }
+        echo "Linking $OK objects..."
+        LINK_OUT=$(clang $CFLAGS $FRAMEWORKS $OBJS -o kfun 2>&1)
+        LINK_RC=$?
+        if [ $LINK_RC -ne 0 ]; then
+          echo "=== LINK ERRORS ==="
+          echo "$LINK_OUT"
+          echo "=== END ==="
+          echo "BUILD FAILED (linker exit $LINK_RC)"
+          exit 1
+        fi
+        ls -la kfun && echo "BUILD OK"
 
     - name: Package IPA
       run: |
