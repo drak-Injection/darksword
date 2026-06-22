@@ -1,8 +1,6 @@
-name: Build IPA
+name: Build kfun IPA
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -11,47 +9,51 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build with clang + create app bundle
+    - name: Compile all sources
       run: |
         cd darksword-kexploit-fun
         SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-        FRAMEWORKS="-framework Foundation -framework UIKit -framework CoreServices -framework Security -framework IOSurface -framework IOKit"
-        FLAGS="-arch arm64 -isysroot $SDK -miphoneos-version-min=15.0 -fobjc-arc -Wno-availability -Wno-everything"
+        FRAMEWORKS="-framework Foundation -framework UIKit -framework CoreServices -framework Security -framework IOSurface -framework IOKit -framework QuartzCore"
+        CFLAGS="-arch arm64 -isysroot $SDK -miphoneos-version-min=15.0 -fobjc-arc -Wno-everything"
+        INCLUDES="-I. -Iresearch -Ikexploit -Ikpf -Iutils -ITaskRop -IXPF/src -IXPF/external/ChOma/include"
 
-        # Compile all .m files into .o
+        mkdir -p build
         OBJS=""
-        for f in *.m kexploit/*.m kpf/*.m TaskRop/*.m research/*.m utils/*.m; do
-          [ -f "$f" ] || continue
-          o="build/$(basename $f .m).o"
-          mkdir -p build/$(dirname $f)
-          clang $FLAGS -c "$f" -o "$o" 2>&1 | grep error || true
-          [ -f "$o" ] && OBJS="$OBJS $o"
+        OK=0
+        FAIL=0
+        for f in $(find . -name "*.m" -o -name "*.c"); do
+          d=$(dirname "$f")
+          mkdir -p "build/$d"
+          o="build/${f%.*}.o"
+          err=$(clang $CFLAGS $INCLUDES -c "$f" -o "$o" 2>&1)
+          if [ -f "$o" ]; then
+            OBJS="$OBJS $o"
+            OK=$((OK + 1))
+          else
+            FAIL=$((FAIL + 1))
+            echo "FAIL: $f"
+            echo "$err" | grep "error:" | head -1
+          fi
         done
 
-        echo "Object count: $(echo $OBJS | wc -w)"
+        echo "=== OK:$OK FAIL:$FAIL ==="
+        [ $FAIL -gt 0 ] && echo "Some files failed to compile"
 
-        # Link
-        clang $FLAGS $FRAMEWORKS $OBJS -o kfun
+        echo "Linking..."
+        clang $CFLAGS $FRAMEWORKS $OBJS -o kfun 2>&1
+        ls -la kfun && echo "BUILD OK" || { echo "BUILD FAILED"; exit 1; }
 
-        if [ -f kfun ]; then
-          echo "BUILD SUCCESS"
-          ls -la kfun
-        else
-          echo "BUILD FAILED"
-          exit 1
-        fi
-
-    - name: Create IPA
+    - name: Package IPA
       run: |
         mkdir -p Payload/kfun.app
         cp darksword-kexploit-fun/kfun Payload/kfun.app/
         cp darksword-kexploit-fun/Info.plist Payload/kfun.app/
-        cp -r darksword-kexploit-fun/Base.lproj Payload/kfun.app/ 2>/dev/null
-        mkdir Payload/kfun.app/Assets.car 2>/dev/null || true
+        mkdir -p Payload/kfun.app/Base.lproj
+        cp darksword-kexploit-fun/Base.lproj/LaunchScreen.storyboard Payload/kfun.app/Base.lproj/ 2>/dev/null || true
         cd Payload && zip -r ../kfun.ipa kfun.app && cd ..
-        ls -la kfun.ipa 2>/dev/null && echo "IPA READY" || echo "IPA FAILED"
+        ls -la kfun.ipa && echo "IPA READY"
 
     - uses: actions/upload-artifact@v4
       with:
-        name: darksword-ipa
+        name: kfun-ipa
         path: kfun.ipa
